@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>P2P 기초 테스트</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #log { border: 1px solid #ccc; height: 200px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h2>WebRTC P2P 기초 연결</h2>
+  <button id="connectBtn">1. P2P 연결 등록 (Offer 생성)</button>
+  <br><br>
+  <div id="log"></div>
+  <input type="text" id="msgInput" placeholder="메시지 입력" disabled>
+  <button id="sendBtn" disabled>전송</button>
+
+  <script>
+    const logDiv = document.getElementById('log');
+    const connectBtn = document.getElementById('connectBtn');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    let ws;
+    let peerConnection;
+    let dataChannel;
+
+    // 구글의 공용 STUN 서버 사용 (피어 간 IP 탐색용)
+    const rtcConfig = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    };
+
+    function log(msg) {
+      logDiv.innerHTML += `<div>${msg}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 1. WebSocket 시그널링 서버 연결
+    ws = new WebSocket('ws://localhost:8765');
+
+    ws.onopen = () => log("시그널링 서버에 연결되었습니다.");
+    
+    ws.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.offer) {
+        log("Offer 수신 -> Answer 응답 생성 중...");
+        createPeerConnection();
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        ws.send(JSON.stringify({ answer }));
+      } 
+      else if (data.answer) {
+        log("Answer 수신 -> P2P 경로 설정 완료 중...");
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      } 
+      else if (data.candidate) {
+        if (peerConnection) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+      }
+    };
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      // ICE Candidate 네트워크 경로 수집 시 서버로 전달
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({ candidate: event.candidate }));
+        }
+      };
+
+      // 상대방이 만든 DataChannel을 받는 이벤트
+      peerConnection.ondatachannel = (event) => {
+        dataChannel = event.channel;
+        setupDataChannel();
+      };
+    }
+
+    // 데이터 채널 이벤트 설정 (직접 통신)
+    function setupDataChannel() {
+      dataChannel.onopen = () => {
+        log("<b>P2P 직접 연결 성공! (파이썬 서버를 거치지 않고 통신합니다)</b>");
+        msgInput.disabled = false;
+        sendBtn.disabled = false;
+      };
+
+      dataChannel.onmessage = (event) => {
+        log(`<b>상대방:</b> ${event.data}`);
+      };
+    }
+
+    // 버튼 클릭: 연결 요청 생성 (Offer)
+    connectBtn.onclick = async () => {
+      createPeerConnection();
+      dataChannel = peerConnection.createDataChannel('chat');
+      setupDataChannel();
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      ws.send(JSON.stringify({ offer }));
+      log("Offer 생성 완료 -> 시그널링 서버로 전송했습니다.");
+    };
+
+    // 메시지 전송 (P2P 통신)
+    sendBtn.onclick = () => {
+      const text = msgInput.value;
+      if (text && dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(text);
+        log(`<b>나:</b> ${text}`);
+        msgInput.value = '';
+      }
+    };
+  </script>
+</body>
+</html>
