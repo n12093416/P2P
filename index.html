@@ -1,34 +1,121 @@
-import asyncio
-import json
-import os
-import websockets
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Render P2P 통신 테스트</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #log { border: 1px solid #ccc; height: 250px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; background-color: #f9f9f9; }
+    input[type="text"] { width: 70%; padding: 8px; }
+    button { padding: 8px 15px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>Render 파이썬 기반 P2P 웹RTC 테스트</h2>
+  <button id="connectBtn">1. P2P 연결 요청 (Offer 생성)</button>
+  <br><br>
+  <div id="log"></div>
+  <input type="text" id="msgInput" placeholder="메시지 입력" disabled>
+  <button id="sendBtn" disabled>전송</button>
 
-# 연결된 접속자(피어) 목록
-ROOM = set()
+  <script>
+    const logDiv = document.getElementById('log');
+    const connectBtn = document.getElementById('connectBtn');
+    const msgInput = document.getElementById('msgInput');
+    const sendBtn = document.getElementById('sendBtn');
 
-async def handler(websocket):
-    ROOM.add(websocket)
-    print(f"새 피어 연결: {websocket.remote_address}")
-    try:
-        async for message in websocket:
-            data = json.loads(message)
-            # 나를 제외한 다른 피어에게 시그널링 데이터 전달
-            for client in ROOM:
-                if client != websocket:
-                    await client.send(json.dumps(data))
-    except websockets.exceptions.ConnectionClosedError:
-        pass
-    finally:
-        ROOM.remove(websocket)
-        print(f"피어 연결 종료: {websocket.remote_address}")
+    let ws;
+    let peerConnection;
+    let dataChannel;
 
-async def main():
-    # Render의 PORT 환경 변수를 읽어옴 (기본값 8765)
-    port = int(os.environ.get("PORT", 8765))
-    # 외부 접속 허용을 위해 0.0.0.0으로 바인딩
-    async with websockets.serve(handler, "0.0.0.0", port):
-        print(f"시그널링 서버 실행 중 (Port: {port})...")
-        await asyncio.Future()
+    // 구글 공용 STUN 서버 (피어 간 네트워크 경로 탐색)
+    const rtcConfig = {
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    };
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    function log(msg) {
+      logDiv.innerHTML += `<div>${msg}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 1. Render 클라우드 서버에 WSS 보안 웹소켓 연결
+    ws = new WebSocket('wss://p2p-3zm6.onrender.com');
+
+    ws.onopen = () => log("<b>[서버]</b> Render 시그널링 서버에 성공적으로 연결되었습니다.");
+    ws.onerror = (err) => log("<b style='color:red;'>[오류]</b> 서버 연결 실패 (서버가 슬립 상태일 수 있으니 잠시 후 새로고침 해보세요)");
+
+    ws.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.offer) {
+        log("<b>[시그널]</b> 상대방의 Offer 수신 -> Answer 응답 생성 중...");
+        createPeerConnection();
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        ws.send(JSON.stringify({ answer }));
+      } 
+      else if (data.answer) {
+        log("<b>[시그널]</b> 상대방의 Answer 수신 -> P2P 연결 수립 완료 중...");
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+      } 
+      else if (data.candidate) {
+        if (peerConnection) {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+      }
+    };
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      // ICE 네트워크 경로 수집 시 서버로 전달
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          ws.send(JSON.stringify({ candidate: event.candidate }));
+        }
+      };
+
+      // 상대방이 생성한 데이터 채널 수신
+      peerConnection.ondatachannel = (event) => {
+        dataChannel = event.channel;
+        setupDataChannel();
+      };
+    }
+
+    function setupDataChannel() {
+      dataChannel.onopen = () => {
+        log("<b style='color:green;'>★ P2P 직접 연결 성공! (이제 파이썬 서버를 거치지 않고 브라우저끼리 직접 통신합니다)</b>");
+        msgInput.disabled = false;
+        sendBtn.disabled = false;
+      };
+
+      dataChannel.onmessage = (event) => {
+        log(`<b style='color:blue;'>상대방:</b> ${event.data}`);
+      };
+    }
+
+    // 버튼 클릭 시 연결 시작 (Offer 전송)
+    connectBtn.onclick = async () => {
+      createPeerConnection();
+      dataChannel = peerConnection.createDataChannel('chat');
+      setupDataChannel();
+
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      ws.send(JSON.stringify({ offer }));
+      log("<b>[시그널]</b> Offer 생성 및 클라우드 서버로 전송 완료. 상대방 대기 중...");
+    };
+
+    // P2P 메시지 전송 (서버를 거치지 않음)
+    sendBtn.onclick = () => {
+      const text = msgInput.value;
+      if (text && dataChannel && dataChannel.readyState === 'open') {
+        dataChannel.send(text);
+        log(`<b>나:</b> ${text}`);
+        msgInput.value = '';
+      }
+    };
+  </script>
+</body>
+</html>
