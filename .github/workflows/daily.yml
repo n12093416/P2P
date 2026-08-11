@@ -1,0 +1,33 @@
+name: Daily Auto Website Update
+
+on:
+  schedule:
+    # 매일 한국 시간 09:00 (UTC 00:00) 실행
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-website:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: HTML 갱신 스크립트 실행
+        run: python bot.py
+
+      - name: 변경사항 자동 커밋 및 푸시
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "chore: 웹사이트 기록 갱신 ($(date +'%Y-%m-%d'))" || exit 0
+          git push
