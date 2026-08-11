@@ -1,21 +1,59 @@
-from datetime import datetime, timezone, timedelta
+import json
+import os
+import random
+from datetime import datetime, timedelta, timezone
 
 # 한국 시간(KST) 설정
 kst = timezone(timedelta(hours=9))
 now = datetime.now(kst)
-today_str = now.strftime("%Y년 %m월 %d일 %H:%M:%S")
+today_date_str = now.strftime("%Y-%m-%d")
+today_time_str = now.strftime("%Y년 %m월 %d일 %H:%M:%S")
 
-# 기준 시작일
-start_date = datetime(2026, 1, 1, tzinfo=kst)
-days_passed = (now - start_date).days
+# 시작일: 2026년 8월 11일 (오늘부터 1일차 시작)
+start_date = datetime(2026, 8, 11, tzinfo=kst)
+days_passed = (now.date() - start_date.date()).days + 1
 
-# 웹사이트용 HTML 생성
+# 1 ~ 1000 난수 생성
+today_random_num = random.randint(1, 1000)
+
+# 지난 기록 파일(history.json) 불러오기
+history_file = "history.json"
+history = []
+if os.path.exists(history_file):
+    try:
+        with open(history_file, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    except Exception:
+        history = []
+
+# 새 기록 추가 및 파일 저장
+new_entry = {
+    "day": days_passed,
+    "date": today_date_str,
+    "number": today_random_num
+}
+history.append(new_entry)
+
+with open(history_file, "w", encoding="utf-8") as f:
+    json.dump(history, f, ensure_ascii=False, indent=2)
+
+# 최근 기록 목록 생성 (최신 순)
+history_items_html = ""
+for item in reversed(history):
+    history_items_html += f"""
+    <div class="history-item">
+      <span>{item['day']}일차 ({item['date']})</span>
+      <span class="num-badge">🎲 {item['number']}</span>
+    </div>
+    """
+
+# 웹사이트 HTML 생성
 html_content = f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>무의미한 기록 웹사이트</title>
+  <title>무의미한 일일 난수 봇</title>
   <style>
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -24,46 +62,76 @@ html_content = f"""<!DOCTYPE html>
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
     }}
     .card {{
       background: #1e293b;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       text-align: center;
-      max-width: 400px;
-      width: 90%;
+      max-width: 420px;
+      width: 100%;
     }}
-    .counter {{
-      font-size: 3rem;
+    .title {{ font-size: 1.2rem; color: #94a3b8; margin-bottom: 4px; }}
+    .days {{ font-size: 1.8rem; font-weight: 800; color: #38bdf8; }}
+    .today-box {{
+      background: #0f172a;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 16px 0;
+      border: 1px solid #334155;
+    }}
+    .today-label {{ font-size: 0.85rem; color: #94a3b8; }}
+    .today-num {{ font-size: 2.8rem; font-weight: 900; color: #f59e0b; margin-top: 4px; }}
+    .history-title {{ font-size: 0.95rem; color: #cbd5e1; text-align: left; margin: 16px 0 8px 4px; }}
+    .history-list {{
+      max-height: 220px;
+      overflow-y: auto;
+      background: #0b1120;
+      border-radius: 12px;
+      padding: 8px 12px;
+    }}
+    .history-item {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }}
+    .history-item:last-child {{ border-bottom: none; }}
+    .num-badge {{
       font-weight: bold;
       color: #38bdf8;
-      margin: 20px 0;
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 6px;
     }}
-    .status {{
-      color: #94a3b8;
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }}
+    .updated {{ margin-top: 16px; font-size: 0.8rem; color: #64748b; }}
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>🤖 무의미한 기록 봇</h2>
-    <div class="counter">{days_passed}일째</div>
-    <div class="status">
-      아무 일도 일어나지 않고 있습니다.<br>
-      <small>마지막 갱신: {today_str}</small>
+    <div class="title">🤖 무의미한 난수 기록 봇</div>
+    <div class="days">{days_passed}일차</div>
+    <div class="today-box">
+      <div class="today-label">오늘의 난수 (1 ~ 1000)</div>
+      <div class="today-num">{today_random_num}</div>
     </div>
+    <div class="history-title">📜 지난 기록 내역</div>
+    <div class="history-list">
+      {history_items_html}
+    </div>
+    <div class="updated">마지막 갱신: {today_time_str}</div>
   </div>
 </body>
 </html>
 """
 
-# index.html 파일로 저장
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html_content)
-
-print(f"웹페이지 갱신 완료: {today_str}")
