@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>무의미한 기록 웹사이트</title>
+  <title>무의미한 일일 난수 봇</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -12,39 +12,77 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
     }
     .card {
       background: #1e293b;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      padding: 24px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       text-align: center;
-      max-width: 400px;
-      width: 90%;
+      max-width: 420px;
+      width: 100%;
     }
-    .counter {
-      font-size: 3rem;
+    .title { font-size: 1.2rem; color: #94a3b8; margin-bottom: 4px; }
+    .days { font-size: 1.8rem; font-weight: 800; color: #38bdf8; }
+    .today-box {
+      background: #0f172a;
+      border-radius: 14px;
+      padding: 16px;
+      margin: 16px 0;
+      border: 1px solid #334155;
+    }
+    .today-label { font-size: 0.85rem; color: #94a3b8; }
+    .today-num { font-size: 2.8rem; font-weight: 900; color: #f59e0b; margin-top: 4px; }
+    .history-title { font-size: 0.95rem; color: #cbd5e1; text-align: left; margin: 16px 0 8px 4px; }
+    .history-list {
+      max-height: 220px;
+      overflow-y: auto;
+      background: #0b1120;
+      border-radius: 12px;
+      padding: 8px 12px;
+    }
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e293b;
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .num-badge {
       font-weight: bold;
       color: #38bdf8;
-      margin: 20px 0;
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 6px;
     }
-    .status {
-      color: #94a3b8;
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
+    .updated { margin-top: 16px; font-size: 0.8rem; color: #64748b; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2>🤖 무의미한 기록 봇</h2>
-    <div class="counter">222일째</div>
-    <div class="status">
-      아무 일도 일어나지 않고 있습니다.<br>
-      <small>마지막 갱신: 2026년 08월 11일 20:58:48</small>
+    <div class="title">🤖 무의미한 난수 기록 봇</div>
+    <div class="days">1일차</div>
+    <div class="today-box">
+      <div class="today-label">오늘의 난수 (1 ~ 1000)</div>
+      <div class="today-num">667</div>
     </div>
+    <div class="history-title">📜 지난 기록 내역</div>
+    <div class="history-list">
+      
+    <div class="history-item">
+      <span>1일차 (2026-08-11)</span>
+      <span class="num-badge">🎲 667</span>
+    </div>
+    
+    </div>
+    <div class="updated">마지막 갱신: 2026년 08월 11일 21:04:40</div>
   </div>
 </body>
 </html>
