@@ -24,33 +24,28 @@ if os.path.exists(history_file):
     except Exception:
         history = []
 
-# 1일차 기록이 아예 없는 경우 어제 기록(667)을 기본으로 넣어 복구
-if not history:
-    history.append({
+# 1일차 기록(667)이 없으면 첫 번째에 추가
+if not any(item.get("day") == 1 or item.get("date") == "2026-08-11" for item in history):
+    history.insert(0, {
         "day": 1,
         "date": "2026-08-11",
         "number": 667
     })
 
-# 오늘 날짜에 해당하는 난수 처리
-if days_passed > 1:
-    today_entry = next((item for item in history if item["date"] == today_date_str), None)
-    if not today_entry:
-        # 오늘 난수가 아직 없으면 새로 뽑기
-        new_number = random.randint(1, 1000)
+# 오늘 기록 확인 및 추가
+today_entry = next((item for item in history if item.get("date") == today_date_str), None)
+if not today_entry:
+    current_today_num = 415 if today_date_str == "2026-08-12" else random.randint(1, 1000)
+    if days_passed > 1:
         history.append({
             "day": days_passed,
             "date": today_date_str,
-            "number": new_number
+            "number": current_today_num
         })
-        current_today_num = new_number
-    else:
-        # 오늘 이미 뽑았으면 기존 번호 유지
-        current_today_num = today_entry["number"]
 else:
-    current_today_num = 667
+    current_today_num = today_entry["number"]
 
-# history.json 파일 저장
+# 파일 영구 저장
 with open(history_file, "w", encoding="utf-8") as f:
     json.dump(history, f, ensure_ascii=False, indent=2)
 
