@@ -9,14 +9,14 @@ now = datetime.now(kst)
 today_date_str = now.strftime("%Y-%m-%d")
 today_time_str = now.strftime("%Y년 %m월 %d일 %H:%M:%S")
 
-# 시작일: 2026년 8월 11일 (오늘부터 1일차 시작)
+# 시작일: 2026년 8월 11일 (1일차)
 start_date = datetime(2026, 8, 11, tzinfo=kst)
 days_passed = (now.date() - start_date.date()).days + 1
 
 # 1 ~ 1000 난수 생성
 today_random_num = random.randint(1, 1000)
 
-# 지난 기록 파일(history.json) 불러오기
+# 지난 기록 파일(history.json) 관리
 history_file = "history.json"
 history = []
 if os.path.exists(history_file):
@@ -26,24 +26,31 @@ if os.path.exists(history_file):
     except Exception:
         history = []
 
-# 새 기록 추가 및 파일 저장
-new_entry = {
-    "day": days_passed,
-    "date": today_date_str,
-    "number": today_random_num
-}
-history.append(new_entry)
+# 중복 기록 방지 (같은 날짜면 갱신, 새 날짜면 추가)
+if history and history[-1].get("date") == today_date_str:
+    history[-1] = {
+        "day": days_passed,
+        "date": today_date_str,
+        "number": today_random_num
+    }
+else:
+    history.append({
+        "day": days_passed,
+        "date": today_date_str,
+        "number": today_random_num
+    })
 
 with open(history_file, "w", encoding="utf-8") as f:
     json.dump(history, f, ensure_ascii=False, indent=2)
 
-# 최근 기록 목록 생성 (최신 순)
-history_items_html = ""
+# 리스트 아이템 HTML 생성 (최신 순 나열)
+list_rows_html = ""
 for item in reversed(history):
-    history_items_html += f"""
-    <div class="history-item">
-      <span>{item['day']}일차 ({item['date']})</span>
-      <span class="num-badge">🎲 {item['number']}</span>
+    list_rows_html += f"""
+    <div class="list-row">
+      <div class="col-day">{item['day']}일차</div>
+      <div class="col-date">{item['date']}</div>
+      <div class="col-num"><span>🎲 {item['number']}</span></div>
     </div>
     """
 
@@ -53,80 +60,108 @@ html_content = f"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>무의미한 일일 난수 봇</title>
+  <title>일일 난수 아카이브</title>
   <style>
+    * {{ box-sizing: border-box; }}
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #0f172a;
+      background-color: #0b0f19;
       color: #f8fafc;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      padding: 20px;
-      box-sizing: border-box;
+      padding: 16px;
     }}
-    .card {{
-      background: #1e293b;
-      padding: 24px;
+    .container {{
+      background: #151d2f;
+      border: 1px solid #1e293b;
+      padding: 24px 20px;
       border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
       text-align: center;
-      max-width: 420px;
+      max-width: 440px;
       width: 100%;
     }}
-    .title {{ font-size: 1.2rem; color: #94a3b8; margin-bottom: 4px; }}
-    .days {{ font-size: 1.8rem; font-weight: 800; color: #38bdf8; }}
-    .today-box {{
-      background: #0f172a;
+    .title {{ font-size: 1.1rem; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }}
+    .days {{ font-size: 1.6rem; font-weight: 800; color: #38bdf8; margin-bottom: 12px; }}
+    .today-card {{
+      background: linear-gradient(145deg, #1e293b, #0f172a);
       border-radius: 14px;
       padding: 16px;
-      margin: 16px 0;
       border: 1px solid #334155;
+      margin-bottom: 18px;
     }}
     .today-label {{ font-size: 0.85rem; color: #94a3b8; }}
-    .today-num {{ font-size: 2.8rem; font-weight: 900; color: #f59e0b; margin-top: 4px; }}
-    .history-title {{ font-size: 0.95rem; color: #cbd5e1; text-align: left; margin: 16px 0 8px 4px; }}
-    .history-list {{
-      max-height: 220px;
-      overflow-y: auto;
-      background: #0b1120;
-      border-radius: 12px;
-      padding: 8px 12px;
+    .today-num {{ font-size: 2.6rem; font-weight: 900; color: #fbbf24; margin-top: 4px; }}
+    
+    .history-box {{
+      text-align: left;
+      margin-top: 10px;
     }}
-    .history-item {{
+    .history-header {{
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid #1e293b;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }}
+    .history-title {{ font-size: 0.95rem; font-weight: 700; color: #e2e8f0; }}
+    .total-count {{ font-size: 0.8rem; color: #64748b; }}
+    
+    .list-wrapper {{
+      max-height: 240px;
+      overflow-y: auto;
+      background: #0d1322;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      padding: 6px 10px;
+    }}
+    .list-wrapper::-webkit-scrollbar {{ width: 6px; }}
+    .list-wrapper::-webkit-scrollbar-thumb {{ background: #334155; border-radius: 4px; }}
+    
+    .list-row {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 4px;
+      border-bottom: 1px solid #1a2333;
       font-size: 0.9rem;
-      color: #94a3b8;
     }}
-    .history-item:last-child {{ border-bottom: none; }}
-    .num-badge {{
-      font-weight: bold;
-      color: #38bdf8;
+    .list-row:last-child {{ border-bottom: none; }}
+    .col-day {{ font-weight: 700; color: #cbd5e1; width: 60px; }}
+    .col-date {{ color: #64748b; font-size: 0.82rem; }}
+    .col-num span {{
       background: #1e293b;
-      padding: 2px 8px;
+      color: #38bdf8;
+      padding: 3px 8px;
       border-radius: 6px;
+      font-weight: 700;
     }}
-    .updated {{ margin-top: 16px; font-size: 0.8rem; color: #64748b; }}
+    .updated {{ margin-top: 16px; font-size: 0.75rem; color: #475569; }}
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="title">🤖 무의미한 난수 기록 봇</div>
+  <div class="container">
+    <div class="title">🤖 일일 난수 기록 봇</div>
     <div class="days">{days_passed}일차</div>
-    <div class="today-box">
+    
+    <div class="today-card">
       <div class="today-label">오늘의 난수 (1 ~ 1000)</div>
       <div class="today-num">{today_random_num}</div>
     </div>
-    <div class="history-title">📜 지난 기록 내역</div>
-    <div class="history-list">
-      {history_items_html}
+    
+    <div class="history-box">
+      <div class="history-header">
+        <span class="history-title">📜 기록 내역 (최신순)</span>
+        <span class="total-count">총 {len(history)}개 누적</span>
+      </div>
+      <div class="list-wrapper">
+        {list_rows_html}
+      </div>
     </div>
+    
     <div class="updated">마지막 갱신: {today_time_str}</div>
   </div>
 </body>
