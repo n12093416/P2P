@@ -4,7 +4,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 # 한국 시간(KST) 설정
-kst = timezone(timedelta(hours=3))
+kst = timezone(timedelta(hours=9))
 now = datetime.now(kst)
 today_date_str = now.strftime("%Y-%m-%d")
 today_time_str = now.strftime("%Y년 %m월 %d일 %H:%M:%S")
