@@ -9,16 +9,14 @@ now = datetime.now(kst)
 today_date_str = now.strftime("%Y-%m-%d")
 today_time_str = now.strftime("%Y년 %m월 %d일 %H:%M:%S")
 
-# 시작일: 2026년 8월 11일 (1일차)
+# 시작일: 2026년 8월 11일 (1일차 기준)
 start_date = datetime(2026, 8, 11, tzinfo=kst)
 days_passed = (now.date() - start_date.date()).days + 1
 
-# 1 ~ 1000 난수 생성
-today_random_num = random.randint(1, 1000)
-
-# 지난 기록 파일(history.json) 관리
+# 기록 파일(history.json) 불러오기
 history_file = "history.json"
 history = []
+
 if os.path.exists(history_file):
     try:
         with open(history_file, "r", encoding="utf-8") as f:
@@ -26,24 +24,37 @@ if os.path.exists(history_file):
     except Exception:
         history = []
 
-# 중복 기록 방지 (같은 날짜면 갱신, 새 날짜면 추가)
-if history and history[-1].get("date") == today_date_str:
-    history[-1] = {
-        "day": days_passed,
-        "date": today_date_str,
-        "number": today_random_num
-    }
-else:
+# 1일차 기록이 아예 없는 경우 어제 기록(667)을 기본으로 넣어 복구
+if not history:
     history.append({
-        "day": days_passed,
-        "date": today_date_str,
-        "number": today_random_num
+        "day": 1,
+        "date": "2026-08-11",
+        "number": 667
     })
 
+# 오늘 날짜에 해당하는 난수 처리
+if days_passed > 1:
+    today_entry = next((item for item in history if item["date"] == today_date_str), None)
+    if not today_entry:
+        # 오늘 난수가 아직 없으면 새로 뽑기
+        new_number = random.randint(1, 1000)
+        history.append({
+            "day": days_passed,
+            "date": today_date_str,
+            "number": new_number
+        })
+        current_today_num = new_number
+    else:
+        # 오늘 이미 뽑았으면 기존 번호 유지
+        current_today_num = today_entry["number"]
+else:
+    current_today_num = 667
+
+# history.json 파일 저장
 with open(history_file, "w", encoding="utf-8") as f:
     json.dump(history, f, ensure_ascii=False, indent=2)
 
-# 리스트 아이템 HTML 생성 (최신 순 나열)
+# 리스트 HTML 생성 (최신순)
 list_rows_html = ""
 for item in reversed(history):
     list_rows_html += f"""
@@ -149,7 +160,7 @@ html_content = f"""<!DOCTYPE html>
     
     <div class="today-card">
       <div class="today-label">오늘의 난수 (1 ~ 1000)</div>
-      <div class="today-num">{today_random_num}</div>
+      <div class="today-num">{current_today_num}</div>
     </div>
     
     <div class="history-box">
